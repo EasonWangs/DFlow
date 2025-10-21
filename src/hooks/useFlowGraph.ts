@@ -78,9 +78,7 @@ export function useFlowGraph({
   const addFlowEvent = (event: FlowEvent) => {
     if (animationEngine) {
       animationEngine.addFlowEvent(event);
-
       // 启动动画
-      if (!animationEngine) return;
       animationEngine.start();
     }
   };

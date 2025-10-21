@@ -129,8 +129,11 @@ export class FlowAnimationEngine {
     const deltaTime = timestamp - this.lastTimestamp;
     this.lastTimestamp = timestamp;
 
-    this.updateFlowEvents(deltaTime);
-    this.updateParticles(deltaTime);
+    // 限制最大 deltaTime，避免标签页切换后的跳跃
+    const clampedDelta = Math.min(deltaTime, 100);
+
+    this.updateFlowEvents(clampedDelta);
+    this.updateParticles(clampedDelta);
 
     // 通知粒子更新
     if (this.listeners.onParticlesUpdate) {
