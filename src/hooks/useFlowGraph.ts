@@ -1,8 +1,8 @@
 /**
- * 核心图管理Hook
+ * 核心图管理 Composable
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as d3 from 'd3';
 import { Node, Edge, FlowEvent, SimulationNode, SimulationEdge, GraphConfig } from '../types/graph';
 import { FlowAnimationEngine } from '../engine/FlowAnimationEngine';
@@ -24,78 +24,81 @@ export function useFlowGraph({
   onNodeClick,
   onEdgeClick,
 }: UseFlowGraphProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [simulationNodes, setSimulationNodes] = useState<SimulationNode[]>([]);
-  const [simulationEdges, setSimulationEdges] = useState<SimulationEdge[]>([]);
+  const svgRef = ref<SVGSVGElement | null>(null);
+  const simulationNodes = ref<SimulationNode[]>([]);
+  const simulationEdges = ref<SimulationEdge[]>([]);
 
-  const animationEngineRef = useRef<FlowAnimationEngine | null>(null);
-  const layoutEngineRef = useRef<LayoutEngine | null>(null);
-  const simulationRef = useRef<d3.Simulation<SimulationNode, SimulationEdge> | null>(null);
+  let animationEngine: FlowAnimationEngine | null = null;
+  let layoutEngine: LayoutEngine | null = null;
+  let simulation: d3.Simulation<SimulationNode, SimulationEdge> | null = null;
 
   // 初始化引擎
-  useEffect(() => {
+  onMounted(() => {
     const width = config.width || 800;
     const height = config.height || 600;
 
-    animationEngineRef.current = new FlowAnimationEngine(config.particlesPerFlow || 3);
-    layoutEngineRef.current = new LayoutEngine(width, height);
+    animationEngine = new FlowAnimationEngine(config.particlesPerFlow || 3);
+    layoutEngine = new LayoutEngine(width, height);
+  });
 
-    return () => {
-      animationEngineRef.current?.destroy();
-      layoutEngineRef.current?.stop();
-    };
-  }, []);
+  // 清理引擎
+  onUnmounted(() => {
+    animationEngine?.destroy();
+    layoutEngine?.stop();
+  });
 
   // 更新图数据
-  useEffect(() => {
-    const simNodes = toSimulationNodes(nodes);
-    const simEdges = toSimulationEdges(edges, simNodes);
+  watch(
+    () => [nodes, edges, config.enableForceSimulation],
+    () => {
+      const simNodes = toSimulationNodes(nodes);
+      const simEdges = toSimulationEdges(edges, simNodes);
 
-    setSimulationNodes(simNodes);
-    setSimulationEdges(simEdges);
+      simulationNodes.value = simNodes;
+      simulationEdges.value = simEdges;
 
-    // 更新动画引擎的节点数据
-    if (animationEngineRef.current) {
-      animationEngineRef.current.setNodes(nodes);
-    }
+      // 更新动画引擎的节点数据
+      if (animationEngine) {
+        animationEngine.setNodes(nodes);
+      }
 
-    // 创建或更新力导向布局
-    if (layoutEngineRef.current && config.enableForceSimulation !== false) {
-      const simulation = layoutEngineRef.current.createForceLayout(simNodes, simEdges);
+      // 创建或更新力导向布局
+      if (layoutEngine && config.enableForceSimulation !== false) {
+        simulation = layoutEngine.createForceLayout(simNodes, simEdges);
 
-      simulation.on('tick', () => {
-        setSimulationNodes([...simNodes]);
-      });
-
-      simulationRef.current = simulation;
-    }
-  }, [nodes, edges, config.enableForceSimulation]);
+        simulation.on('tick', () => {
+          simulationNodes.value = [...simNodes];
+        });
+      }
+    },
+    { deep: true, immediate: true }
+  );
 
   // 添加流动事件
-  const addFlowEvent = useCallback((event: FlowEvent) => {
-    if (animationEngineRef.current) {
-      animationEngineRef.current.addFlowEvent(event);
+  const addFlowEvent = (event: FlowEvent) => {
+    if (animationEngine) {
+      animationEngine.addFlowEvent(event);
 
       // 启动动画
-      if (!animationEngineRef.current) return;
-      animationEngineRef.current.start();
+      if (!animationEngine) return;
+      animationEngine.start();
     }
-  }, []);
+  };
 
   // 更新节点数据
-  const updateNodeData = useCallback((nodeId: string, newAmount: number) => {
-    if (animationEngineRef.current) {
-      animationEngineRef.current.updateNodeData(nodeId, newAmount);
+  const updateNodeData = (nodeId: string, newAmount: number) => {
+    if (animationEngine) {
+      animationEngine.updateNodeData(nodeId, newAmount);
     }
-  }, []);
+  };
 
   return {
     svgRef,
     simulationNodes,
     simulationEdges,
-    animationEngine: animationEngineRef.current,
-    layoutEngine: layoutEngineRef.current,
-    simulation: simulationRef.current,
+    animationEngine: () => animationEngine,
+    layoutEngine: () => layoutEngine,
+    simulation: () => simulation,
     addFlowEvent,
     updateNodeData,
   };

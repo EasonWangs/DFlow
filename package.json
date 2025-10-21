@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext .vue,.ts --report-unused-disable-directives --max-warnings 0"
   },
   "repository": {
     "type": "git",
@@ -17,29 +17,27 @@
     "visualization",
     "data-flow",
     "d3",
-    "react",
+    "vue",
     "graph",
     "network"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "vue": "^3.3.11",
     "d3": "^7.8.5",
-    "zustand": "^4.4.7"
+    "pinia": "^2.1.7"
   },
   "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
     "@types/d3": "^7.4.3",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "@vue/eslint-config-typescript": "^12.0.0",
     "eslint": "^8.55.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
+    "eslint-plugin-vue": "^9.19.2",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8"
+    "vite": "^5.0.8",
+    "vue-tsc": "^1.8.27"
   }
 }
