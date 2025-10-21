@@ -181,20 +181,29 @@ const {
   onEdgeClick: props.onEdgeClick,
 });
 
-// 设置缩放
+// 设置缩放和粒子监听
 onMounted(() => {
-  if (!svgRef.value || !gRef.value || !config.value.enableZoom) return;
+  // 设置缩放
+  if (svgRef.value && gRef.value && config.value.enableZoom) {
+    const svg = d3.select(svgRef.value);
+    const g = d3.select(gRef.value);
 
-  const svg = d3.select(svgRef.value);
-  const g = d3.select(gRef.value);
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform);
+      });
 
-  const zoom = d3.zoom<SVGSVGElement, unknown>()
-    .scaleExtent([0.1, 4])
-    .on('zoom', (event) => {
-      g.attr('transform', event.transform);
+    svg.call(zoom);
+  }
+
+  // 监听动画引擎的粒子更新
+  const engine = animationEngine();
+  if (engine) {
+    engine.on('particlesUpdate', (newParticles: FlowParticle[]) => {
+      particles.value = newParticles;
     });
-
-  svg.call(zoom);
+  }
 });
 
 // 设置拖拽
@@ -226,15 +235,6 @@ watch([simulationNodes, () => config.value.enableDrag], () => {
 
   svg.selectAll<SVGCircleElement, SimulationNode>('.node')
     .call(drag);
-});
-
-// 监听动画引擎的粒子更新
-watch(animationEngine, (engine) => {
-  if (!engine) return;
-
-  engine.on('particlesUpdate', (newParticles: FlowParticle[]) => {
-    particles.value = newParticles;
-  });
 });
 
 // 添加流动事件

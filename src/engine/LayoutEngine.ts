@@ -34,6 +34,16 @@ export class LayoutEngine {
       centerStrength = 0.1,
     } = options || {};
 
+    // 为没有位置的节点设置初始位置（环形分布，避免初始闪烁）
+    nodes.forEach((node, i) => {
+      if (node.x === undefined || node.y === undefined) {
+        const angle = (i / nodes.length) * Math.PI * 2;
+        const radius = Math.min(this.width, this.height) / 4;
+        node.x = this.width / 2 + radius * Math.cos(angle);
+        node.y = this.height / 2 + radius * Math.sin(angle);
+      }
+    });
+
     this.simulation = d3
       .forceSimulation(nodes)
       .force(
