@@ -1,16 +1,15 @@
 /**
- * 使用 Anime.js 的图管理 Composable
- * 这是一个 POC，用于对比 Anime.js 和原生 RAF 实现
+ * 核心图管理 Composable
  */
 
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as d3 from 'd3';
 import { Node, Edge, FlowEvent, SimulationNode, SimulationEdge, GraphConfig } from '../types/graph';
-import { AnimeFlowAnimationEngine } from '../engine/AnimeFlowAnimationEngine';
+import { FlowAnimationEngine } from '../engine/FlowAnimationEngine';
 import { LayoutEngine } from '../engine/LayoutEngine';
 import { toSimulationNodes, toSimulationEdges } from '../utils/graphUtils';
 
-interface UseAnimeFlowGraphProps {
+interface UseFlowGraphProps {
   nodes: Node[];
   edges: Edge[];
   config: Partial<GraphConfig>;
@@ -18,18 +17,18 @@ interface UseAnimeFlowGraphProps {
   onEdgeClick?: (edge: Edge) => void;
 }
 
-export function useAnimeFlowGraph({
+export function useFlowGraph({
   nodes,
   edges,
   config,
   onNodeClick,
   onEdgeClick,
-}: UseAnimeFlowGraphProps) {
+}: UseFlowGraphProps) {
   const svgRef = ref<SVGSVGElement | null>(null);
   const simulationNodes = ref<SimulationNode[]>([]);
   const simulationEdges = ref<SimulationEdge[]>([]);
 
-  let animationEngine: AnimeFlowAnimationEngine | null = null;
+  let animationEngine: FlowAnimationEngine | null = null;
   let layoutEngine: LayoutEngine | null = null;
   let simulation: d3.Simulation<SimulationNode, SimulationEdge> | null = null;
 
@@ -38,7 +37,7 @@ export function useAnimeFlowGraph({
     const width = config.width || 800;
     const height = config.height || 600;
 
-    animationEngine = new AnimeFlowAnimationEngine(config.particlesPerFlow || 3);
+    animationEngine = new FlowAnimationEngine(config.particlesPerFlow || 3);
     layoutEngine = new LayoutEngine(width, height);
   });
 
@@ -79,7 +78,7 @@ export function useAnimeFlowGraph({
   const addFlowEvent = (event: FlowEvent) => {
     if (animationEngine) {
       animationEngine.addFlowEvent(event);
-      // Anime.js 会自动开始动画
+      // 启动动画
       animationEngine.start();
     }
   };
