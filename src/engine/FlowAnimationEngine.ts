@@ -3,7 +3,7 @@
  * 管理数据流动动画和节点数据量的动态变化
  */
 
-import anime from 'animejs';
+import anime from 'animejs/lib/anime.es.js';
 import { FlowEvent, FlowParticle, Node } from '../types/graph';
 
 export class FlowAnimationEngine {

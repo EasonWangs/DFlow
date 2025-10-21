@@ -24,7 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "animejs": "^4.2.2",
+    "animejs": "^3.2.2",
     "d3": "^7.8.5",
     "pinia": "^2.1.7",
     "vue": "^3.3.11"
