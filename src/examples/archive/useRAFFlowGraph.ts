@@ -1,5 +1,5 @@
 /**
- * 核心图管理 Composable（基于 Anime.js）
+ * 核心图管理 Composable
  */
 
 import { ref, onMounted, onUnmounted, watch } from 'vue';
@@ -78,7 +78,7 @@ export function useFlowGraph({
   const addFlowEvent = (event: FlowEvent) => {
     if (animationEngine) {
       animationEngine.addFlowEvent(event);
-      // Anime.js 会自动开始动画
+      // 启动动画
       animationEngine.start();
     }
   };

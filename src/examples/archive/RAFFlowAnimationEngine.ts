@@ -1,16 +1,17 @@
 /**
- * 流动画引擎（基于 Anime.js）
+ * 流动画引擎
  * 管理数据流动动画和节点数据量的动态变化
  */
 
-import anime from 'animejs/lib/anime.es.js';
 import { FlowEvent, FlowParticle, Node } from '../types/graph';
 
 export class FlowAnimationEngine {
   private flowEvents: Map<string, FlowEvent> = new Map();
   private particles: Map<string, FlowParticle[]> = new Map();
   private nodes: Map<string, Node> = new Map();
-  private animations: Map<string, anime.AnimeInstance> = new Map();
+  private animationFrameId: number | null = null;
+  private lastTimestamp: number = 0;
+  private isRunning: boolean = false;
   private particlesPerFlow: number = 3;
 
   // 事件监听器
@@ -35,7 +36,7 @@ export class FlowAnimationEngine {
   }
 
   /**
-   * 添加流动事件 - 使用 Anime.js
+   * 添加流动事件
    */
   addFlowEvent(event: FlowEvent): void {
     const flowEvent: FlowEvent = {
@@ -52,101 +53,143 @@ export class FlowAnimationEngine {
       particles.push({
         id: `${event.id}-particle-${i}`,
         edgeId: event.edgeId,
-        progress: 0, // 从 0 开始
+        progress: i / this.particlesPerFlow, // 均匀分布
         size: 4 + Math.random() * 2,
         color: this.getFlowColor(event.amount),
       });
     }
     this.particles.set(event.id, particles);
-
-    // 使用 Anime.js 创建交错动画
-    const animation = anime({
-      targets: particles,
-      progress: 1,
-      duration: event.duration,
-      delay: anime.stagger(100), // 每个粒子延迟 100ms，形成流动效果
-      easing: 'easeInOutQuad', // 平滑的缓动
-      update: (anim) => {
-        // 更新事件进度
-        flowEvent.progress = anim.progress / 100; // Anime.js 返回 0-100
-        flowEvent.status = flowEvent.progress > 0 ? 'active' : 'pending';
-
-        // 通知粒子更新
-        if (this.listeners.onParticlesUpdate) {
-          const allParticles = Array.from(this.particles.values()).flat();
-          this.listeners.onParticlesUpdate(allParticles);
-        }
-      },
-      complete: () => {
-        this.handleFlowComplete(flowEvent);
-      }
-    });
-
-    this.animations.set(event.id, animation);
   }
 
   /**
    * 移除流动事件
    */
   removeFlowEvent(eventId: string): void {
-    const animation = this.animations.get(eventId);
-    if (animation) {
-      // Anime.js 不需要手动停止，会自动完成
-      this.animations.delete(eventId);
-    }
     this.flowEvents.delete(eventId);
     this.particles.delete(eventId);
   }
 
   /**
-   * 更新节点数据量 - 使用 Anime.js
+   * 更新节点数据量
    */
   updateNodeData(nodeId: string, newAmount: number, duration: number = 500): void {
     const node = this.nodes.get(nodeId);
     if (!node) return;
 
-    // Anime.js 自动处理数值插值和缓动
-    anime({
-      targets: node,
-      dataAmount: newAmount,
-      duration: duration,
-      easing: 'easeInOutCubic',
-      round: 1, // 四舍五入到整数
-      update: () => {
-        if (this.listeners.onNodeUpdate) {
-          this.listeners.onNodeUpdate({ ...node });
-        }
+    const oldAmount = node.dataAmount;
+    const startTime = Date.now();
+
+    // 使用缓动函数平滑过渡
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = this.easeInOutCubic(progress);
+
+      node.dataAmount = oldAmount + (newAmount - oldAmount) * easedProgress;
+
+      if (this.listeners.onNodeUpdate) {
+        this.listeners.onNodeUpdate({ ...node });
       }
-    });
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
   }
 
   /**
-   * 启动动画（Anime.js 自动管理，此方法保持接口一致）
+   * 启动动画
    */
   start(): void {
-    // Anime.js 会自动开始动画，无需手动启动
-    // 保留此方法是为了与原有 API 保持一致
+    if (this.isRunning) return;
+    this.isRunning = true;
+    this.lastTimestamp = performance.now();
+    this.tick(this.lastTimestamp);
   }
 
   /**
-   * 暂停所有动画
+   * 暂停动画
    */
   pause(): void {
-    this.animations.forEach(anim => {
-      if (anim && !anim.paused) {
-        anim.pause();
+    this.isRunning = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  /**
+   * 动画帧更新
+   */
+  private tick(timestamp: number): void {
+    if (!this.isRunning) return;
+
+    const deltaTime = timestamp - this.lastTimestamp;
+    this.lastTimestamp = timestamp;
+
+    // 限制最大 deltaTime，避免标签页切换后的跳跃
+    const clampedDelta = Math.min(deltaTime, 100);
+
+    this.updateFlowEvents(clampedDelta);
+    this.updateParticles(clampedDelta);
+
+    // 通知粒子更新
+    if (this.listeners.onParticlesUpdate) {
+      const allParticles = Array.from(this.particles.values()).flat();
+      this.listeners.onParticlesUpdate(allParticles);
+    }
+
+    this.animationFrameId = requestAnimationFrame((ts) => this.tick(ts));
+  }
+
+  /**
+   * 更新流动事件
+   */
+  private updateFlowEvents(deltaTime: number): void {
+    const completedEvents: FlowEvent[] = [];
+
+    this.flowEvents.forEach((event) => {
+      if (event.status === 'completed') return;
+
+      const elapsed = Date.now() - event.startTime;
+      event.progress = Math.min(elapsed / event.duration, 1);
+
+      if (event.status === 'pending' && event.progress > 0) {
+        event.status = 'active';
       }
+
+      if (event.progress >= 1) {
+        event.status = 'completed';
+        completedEvents.push(event);
+      }
+    });
+
+    // 处理完成的事件
+    completedEvents.forEach((event) => {
+      this.handleFlowComplete(event);
     });
   }
 
   /**
-   * 恢复所有动画
+   * 更新粒子位置
    */
-  resume(): void {
-    this.animations.forEach(anim => {
-      if (anim && anim.paused) {
-        anim.play();
-      }
+  private updateParticles(deltaTime: number): void {
+    this.particles.forEach((particles, eventId) => {
+      const event = this.flowEvents.get(eventId);
+      if (!event || event.status === 'completed') return;
+
+      particles.forEach((particle) => {
+        // 粒子速度基于事件持续时间
+        const speed = 1 / event.duration;
+        particle.progress += speed * deltaTime;
+
+        // 粒子循环
+        if (particle.progress > 1) {
+          particle.progress = 0;
+        }
+      });
     });
   }
 
@@ -154,15 +197,13 @@ export class FlowAnimationEngine {
    * 处理流动完成
    */
   private handleFlowComplete(event: FlowEvent): void {
-    event.status = 'completed';
-
+    // 通知监听器
     if (this.listeners.onFlowComplete) {
       this.listeners.onFlowComplete(event);
     }
 
-    // 清理
+    // 清理粒子
     this.particles.delete(event.id);
-    this.animations.delete(event.id);
     this.flowEvents.delete(event.id);
   }
 
@@ -170,13 +211,14 @@ export class FlowAnimationEngine {
    * 获取流动颜色
    */
   private getFlowColor(amount: number): string {
+    // 根据流量大小返回不同颜色
     if (amount > 100) return '#ff4444';
     if (amount > 50) return '#ff9944';
     return '#44aaff';
   }
 
   /**
-   * 缓动函数：三次方缓入缓出（保留兼容性，Anime.js 已内置）
+   * 缓动函数：三次方缓入缓出
    */
   private easeInOutCubic(t: number): number {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -216,13 +258,7 @@ export class FlowAnimationEngine {
    * 清理资源
    */
   destroy(): void {
-    // 停止所有动画
-    this.animations.forEach(anim => {
-      if (anim) {
-        anim.pause();
-      }
-    });
-    this.animations.clear();
+    this.pause();
     this.flowEvents.clear();
     this.particles.clear();
     this.nodes.clear();
