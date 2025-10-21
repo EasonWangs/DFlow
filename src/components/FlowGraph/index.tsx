@@ -1,1 +1,1 @@
-export { FlowGraph } from './FlowGraph';
+export { default as FlowGraph } from './FlowGraph.vue';
